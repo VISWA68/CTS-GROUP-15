@@ -1,0 +1,11 @@
+streamlit
+PyMuPDF
+pdf2image
+pytesseract
+camelot-py[cv]
+pandas
+sentence-transformers
+chromadb
+google-generativeai
+python-dotenv
+redis

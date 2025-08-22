@@ -1,0 +1,5 @@
+venv/
+.env
+chroma_store/
+pdf_assets/
+ingest_logs.db
