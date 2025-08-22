@@ -43,14 +43,14 @@ CHROMA_PERSIST_DIR = str(DATA_DIR / "chroma_store")
 
 # Model configuration
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
-GEMINI_MODEL = "gemini-1.5-flash"
+GEMINI_MODEL = "gemini-2.5-flash"
 CHUNK_MAX_CHARS = 2000
 CHUNK_OVERLAP = 200
 BATCH_SIZE = 32
 CONFIDENCE_THRESHOLD = 0.6
 
 # Configure Gemini
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "AIzaSyC1bl7-pGAEh98YuozBf52AFriizMpsfL0")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # =====================================
