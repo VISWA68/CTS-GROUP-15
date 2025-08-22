@@ -902,7 +902,6 @@ def main():
             orchestrator.session_agent.update_history(st.session_state.session_id, "system", "History cleared")
             st.rerun()
 
-    # Main chat interface
     history = orchestrator.session_agent.get_history(st.session_state.session_id)
 
     # Display chat history
@@ -917,23 +916,78 @@ def main():
         # Display user message
         with st.chat_message("user"):
             st.markdown(query)
-
         orchestrator.session_agent.update_history(st.session_state.session_id, "user", query)
 
         # Process query
         with st.chat_message("assistant"):
             with st.spinner("Processing your query..."):
-                response = orchestrator.process_query(query, st.session_state.session_id)
+                # Step 1: Entity Recognition
+                entities = orchestrator.retrieval_agent.extract_entities(query)
 
-            # Format response
+                # Step 2: Vector Search
+                filter_metadata = None
+                if entities.get("drugs"):
+                    drug_filter = {"drug": {"$in": entities["drugs"]}}
+                    filter_metadata = drug_filter
+                retrievals = orchestrator.retrieval_agent.vector_search(
+                    query, top_k=8, filter_metadata=filter_metadata
+                )
+
+                # Step 3: Reasoning and Filtering
+                filtered_retrievals = orchestrator.reasoning_agent.assess_chunk_relevance(query, retrievals)
+
+                # Step 4: Check if sufficient information exists
+                has_sufficient_info = orchestrator.reasoning_agent.check_relationships_exist(filtered_retrievals, query)
+
+                if not has_sufficient_info:
+                    response = {
+                        "short_answer": "I don't have sufficient relevant information to answer your query based on the available documents.",
+                        "confidence_score": 0.0,
+                        "citations": [],
+                        "reasoning": "Insufficient relevant information in knowledge base.",
+                        "entities_found": entities
+                    }
+                else:
+                    # Step 5: Generate Final Answer
+                    history = orchestrator.session_agent.get_history(st.session_state.session_id)
+                    response = orchestrator.answer_agent.generate_final_response(query, history, filtered_retrievals[:4])
+                    response["entities_found"] = entities
+
+            # Display the full process in expandable sections
+            with st.expander("🔍 **Full Analysis Process**", expanded=False):
+                st.subheader("1. Entity Extraction")
+                st.json(entities)
+
+                st.subheader("2. Vector Search Results")
+                for i, retrieval in enumerate(retrievals):
+                    st.markdown(f"**Retrieval {i+1}**")
+                    st.markdown(f"- **Text:** {retrieval['text'][:200]}...")
+                    st.markdown(f"- **Source:** {retrieval['metadata'].get('source_file', 'Unknown')}")
+                    st.markdown(f"- **Page:** {retrieval['metadata'].get('page', 'N/A')}")
+                    st.markdown(f"- **Section:** {retrieval['metadata'].get('section', 'N/A')}")
+                    st.markdown(f"- **Similarity:** {retrieval['similarity']:.2f}")
+                    st.markdown("---")
+
+                st.subheader("3. Filtered Retrievals (Relevance Scored)")
+                for i, retrieval in enumerate(filtered_retrievals):
+                    st.markdown(f"**Filtered Retrieval {i+1}**")
+                    st.markdown(f"- **Text:** {retrieval['text'][:200]}...")
+                    st.markdown(f"- **Relevance Score:** {retrieval.get('relevance_score', 0.0):.2f}")
+                    st.markdown(f"- **Source:** {retrieval['metadata'].get('source_file', 'Unknown')}")
+                    st.markdown(f"- **Page:** {retrieval['metadata'].get('page', 'N/A')}")
+                    st.markdown(f"- **Section:** {retrieval['metadata'].get('section', 'N/A')}")
+                    st.markdown("---")
+
+                st.subheader("4. Final Answer Generation")
+                st.markdown(f"- **Confidence:** {response.get('confidence_score', 0.0):.2f}")
+                st.markdown(f"- **Reasoning:** {response.get('reasoning', 'No reasoning provided')}")
+
+            # Format and display the final response
             formatted_response = f"""
             **Answer:** {response.get('short_answer', 'No answer available')}
-
             **Confidence:** {response.get('confidence_score', 0.0):.2f}
-
             **Reasoning:** {response.get('reasoning', 'No reasoning provided')}
             """
-
             if response.get('citations'):
                 formatted_response += "\n\n**Sources:**\n"
                 for i, citation in enumerate(response['citations'], 1):
@@ -941,10 +995,6 @@ def main():
                     formatted_response += f"(Page: {citation.get('page_reference', 'N/A')}, "
                     formatted_response += f"Section: {citation.get('section_id', 'N/A')}, "
                     formatted_response += f"Relevance: {citation.get('relevance_score', 0.0):.2f})\n"
-
-            if response.get('entities_found'):
-                with st.expander("🔍 Entity Analysis"):
-                    st.json(response['entities_found'])
 
             st.markdown(formatted_response)
 
