@@ -198,5 +198,5 @@ Can Rinvoq be taken with Humira?
 
 ---
 
-👨‍💻 **Author**: Your Name  
+👨‍💻 **Author**: **JAYA KARTHICK R, YOGESWARAN S, HARISH A**   
 📅 **Last Updated**: August 2025  
