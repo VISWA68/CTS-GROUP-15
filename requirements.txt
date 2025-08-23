@@ -1,4 +1,17 @@
 streamlit
+crewai
+fitz
+pdf2image
+pytesseract
+camelot-py
+pandas
+Pillow
+sentence-transformers
+chromadb
+google-generativeai
+python-dotenv
+redis
+streamlit
 PyMuPDF
 pdf2image
 pytesseract
