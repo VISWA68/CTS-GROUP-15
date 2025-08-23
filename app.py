@@ -5,6 +5,7 @@ Uses Gemini API instead of OpenAI, with confidence-based filtering
 Improved PDF extraction: tables, figures, OCR, and heading detection
 
 """
+
 import streamlit as st
 # Crew AI imports
 from crewai import Crew, Agent, Task
@@ -21,13 +22,15 @@ from typing import List, Dict, Any, Tuple, Optional
 import logging
 from functools import wraps
 import io
+
 # PDF processing imports
 import fitz  # PyMuPDF
-from pdf2image import convert_from_path
+from pdf2image import convert_from_path  # noqa: F401 (import kept for parity/optional use)
 import pytesseract
 import camelot
 import pandas as pd
 from PIL import Image
+
 # ML/AI imports
 from sentence_transformers import SentenceTransformer
 import chromadb
@@ -35,6 +38,7 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 
 load_dotenv()
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -47,6 +51,7 @@ PDF_DIR = DATA_DIR / "pdfs"
 ASSETS_DIR = DATA_DIR / "pdf_assets"
 LOG_DB = DATA_DIR / "ingest_logs.db"
 CHROMA_PERSIST_DIR = str(DATA_DIR / "chroma_store")
+
 # Model configuration
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 GEMINI_MODEL = "gemini-2.5-flash"
@@ -65,8 +70,10 @@ genai.configure(api_key=GOOGLE_API_KEY)
 # =====================================
 # UTILITY FUNCTIONS
 # =====================================
+
 def sha1(text: str) -> str:
     return hashlib.sha1(text.encode("utf-8")).hexdigest()
+
 
 def file_sha1(path: Path) -> str:
     h = hashlib.sha1()
@@ -75,8 +82,10 @@ def file_sha1(path: Path) -> str:
             h.update(chunk)
     return h.hexdigest()
 
+
 def ensure_dir(p: Path):
     p.mkdir(parents=True, exist_ok=True)
+
 
 def retry(max_tries=3, backoff=1.0, exceptions=(Exception,)):
     def deco(func):
@@ -92,13 +101,14 @@ def retry(max_tries=3, backoff=1.0, exceptions=(Exception,)):
                     logger.warning(f"{func.__name__} failed (attempt {attempt}/{max_tries}): {e}")
                     time.sleep(delay)
                     delay *= 2
-            return wrapper
-        return deco
+        return wrapper
     return deco
 
 # =====================================
 # AGENT 1: DATA INGESTION
 # =====================================
+
+
 class DataIngestionAgent:
     def __init__(self):
         self.embedder = SentenceTransformer(EMBEDDING_MODEL_NAME)
@@ -122,23 +132,27 @@ class DataIngestionAgent:
     def _init_log_db(self):
         conn = self._get_db_connection()
         cur = conn.cursor()
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS ingests (
-            id TEXT PRIMARY KEY,
-            file TEXT,
-            file_hash TEXT,
-            pages INTEGER,
-            chunks INTEGER,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            meta JSON
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ingests (
+                id TEXT PRIMARY KEY,
+                file TEXT,
+                file_hash TEXT,
+                pages INTEGER,
+                chunks INTEGER,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                meta JSON
+            )
+            """
         )
-        """)
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS dedupe_hashes (
-            hash TEXT PRIMARY KEY,
-            first_seen DATETIME DEFAULT CURRENT_TIMESTAMP
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS dedupe_hashes (
+                hash TEXT PRIMARY KEY,
+                first_seen DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+            """
         )
-        """)
         conn.commit()
         conn.close()
 
@@ -158,7 +172,6 @@ class DataIngestionAgent:
 
     def _detect_headings_with_fonts(self, page: fitz.Page) -> List[Tuple[int, str]]:
         """Return list of (char_index, heading_text) using font size heuristics."""
-        text = page.get_text("text")
         try:
             d = page.get_text("dict")
             blocks = d.get("blocks", [])
@@ -178,10 +191,11 @@ class DataIngestionAgent:
                         candidates.append((char_cursor, stripped))
                     char_cursor += len(line_text) + 1
             if not candidates:
-                return self._detect_headings_from_page_text(text)
+                # fallback
+                return self._detect_headings_from_page_text(page.get_text("text"))
             return candidates
         except Exception:
-            return self._detect_headings_from_page_text(text)
+            return self._detect_headings_from_page_text(page.get_text("text"))
 
     def _detect_headings_from_page_text(self, page_text: str) -> List[Tuple[int, str]]:
         headings = []
@@ -192,8 +206,14 @@ class DataIngestionAgent:
             if not stripped:
                 idx += len(line) + 1
                 continue
-            if (re.match(r'^\d+(\.\d+)*\s+[A-Z][A-Z0-9 \-\,\(\)\/]+$', stripped) or
-                (len(stripped) >= 10 and stripped.upper() == stripped and sum(c.isalpha() for c in stripped) > 4)):
+            if (
+                re.match(r'^\d+(\.\d+)*\s+[A-Z][A-Z0-9 \-\,\(\)\/]+$', stripped)
+                or (
+                    len(stripped) >= 10
+                    and stripped.upper() == stripped
+                    and sum(c.isalpha() for c in stripped) > 4
+                )
+            ):
                 headings.append((idx, stripped))
             idx += len(line) + 1
         return headings
@@ -202,7 +222,9 @@ class DataIngestionAgent:
         """Detect headings using font size heuristics, fall back to text patterns."""
         return self._detect_headings_with_fonts(page)
 
-    def _assign_section(self, page_text: str, chunk_start_idx: int, headings: List[Tuple[int, str]]) -> str:
+    def _assign_section(
+        self, page_text: str, chunk_start_idx: int, headings: List[Tuple[int, str]]
+    ) -> str:
         section = "Unknown"
         for idx, h in headings:
             if idx <= chunk_start_idx:
@@ -218,7 +240,9 @@ class DataIngestionAgent:
 
         if USE_CAMELOT:
             try:
-                camelot_tables = camelot.read_pdf(str(pdf_path), pages='all', flavor='stream')
+                camelot_tables = camelot.read_pdf(
+                    str(pdf_path), pages="all", flavor="stream"
+                )
                 logger.info(f"[Camelot] Found {len(camelot_tables)} table(s)")
             except Exception as e:
                 logger.warning(f"[Camelot] Error: {e}")
@@ -242,12 +266,14 @@ class DataIngestionAgent:
                     text = ocr_text
                     img_path = temp_image_dir / f"{pdf_path.stem}_page_{page_num}.png"
                     img.save(img_path)
-                    figures.append({
-                        "page": page_num,
-                        "figure_id": f"{pdf_path.stem}_page_{page_num}",
-                        "image_path": str(img_path),
-                        "ocr_text": ocr_text.strip()[:5000]
-                    })
+                    figures.append(
+                        {
+                            "page": page_num,
+                            "figure_id": f"{pdf_path.stem}_page_{page_num}",
+                            "image_path": str(img_path),
+                            "ocr_text": ocr_text.strip()[:5000],
+                        }
+                    )
                 except Exception as e:
                     logger.warning(f"OCR fallback failed: {e}")
 
@@ -259,19 +285,26 @@ class DataIngestionAgent:
                     base_image = doc.extract_image(xref)
                     image_bytes = base_image["image"]
                     ext = base_image.get("ext", "png")
-                    img_path = temp_image_dir / f"{pdf_path.stem}_p{page_num}_img{img_index}.{ext}"
+                    img_path = (
+                        temp_image_dir
+                        / f"{pdf_path.stem}_p{page_num}_img{img_index}.{ext}"
+                    )
                     with open(img_path, "wb") as f:
                         f.write(image_bytes)
                     img_obj = Image.open(io.BytesIO(image_bytes))
                     ocr_text = pytesseract.image_to_string(img_obj)
-                    figures.append({
-                        "page": page_num,
-                        "figure_id": f"{pdf_path.stem}_p{page_num}_img{img_index}",
-                        "image_path": str(img_path),
-                        "ocr_text": ocr_text.strip()[:5000]
-                    })
+                    figures.append(
+                        {
+                            "page": page_num,
+                            "figure_id": f"{pdf_path.stem}_p{page_num}_img{img_index}",
+                            "image_path": str(img_path),
+                            "ocr_text": ocr_text.strip()[:5000],
+                        }
+                    )
                 except Exception:
-                    logger.debug(f"Embedded image processing failed on {pdf_path.name} page {page_num} image {img_index}")
+                    logger.debug(
+                        f"Embedded image processing failed on {pdf_path.name} page {page_num} image {img_index}"
+                    )
                     continue
 
             page_texts.append({"page": page_num, "text": text})
@@ -286,15 +319,17 @@ class DataIngestionAgent:
                 html_path = temp_image_dir / f"{table_id}.html"
                 df.to_csv(csv_path, index=False)
                 df.to_html(html_path, index=False)
-                tables.append({
-                    "page": pg,
-                    "table_id": table_id,
-                    "csv_path": str(csv_path),
-                    "html_path": str(html_path),
-                    "nrows": len(df),
-                    "ncols": len(df.columns),
-                    "preview": df.head(3).to_dict(orient="records")
-                })
+                tables.append(
+                    {
+                        "page": pg,
+                        "table_id": table_id,
+                        "csv_path": str(csv_path),
+                        "html_path": str(html_path),
+                        "nrows": len(df),
+                        "ncols": len(df.columns),
+                        "preview": df.head(3).to_dict(orient="records"),
+                    }
+                )
             except Exception as e:
                 logger.warning(f"Camelot processing error: {e}")
 
@@ -322,7 +357,7 @@ class DataIngestionAgent:
         if not text:
             return []
 
-        sentences = re.split(r'(?<=[\.\?\!])\s+', text)
+        sentences = re.split(r"(?<=[\.?\!])\s+", text)
         chunks = []
         cur_sentences = []
         cur_len = 0
@@ -409,7 +444,10 @@ class DataIngestionAgent:
                         continue
                     self.dedupe_hashes.add(h)
                     try:
-                        cur.execute("INSERT OR IGNORE INTO dedupe_hashes (hash) VALUES (?)", (h,))
+                        cur.execute(
+                            "INSERT OR IGNORE INTO dedupe_hashes (hash) VALUES (?)",
+                            (h,),
+                        )
                         conn.commit()
                     except Exception:
                         logger.debug("Could not persist dedupe hash")
@@ -422,7 +460,7 @@ class DataIngestionAgent:
                         "section": section,
                         "chunk_start": start_char,
                         "chunk_id": doc_id,
-                        "type": "text_chunk"
+                        "type": "text_chunk",
                     }
                     all_chunks_to_embed.append(chunk_text_val)
                     all_metadatas.append(metadata)
@@ -432,10 +470,12 @@ class DataIngestionAgent:
             # Tables
             for table in extracted["tables"]:
                 try:
-                    df = pd.read_csv(table["csv_path"]) if Path(table["csv_path"]).exists() else None
+                    df = (
+                        pd.read_csv(table["csv_path"]) if Path(table["csv_path"]).exists() else None
+                    )
                     if df is not None:
-                        df = df.dropna(axis=1, how='all')
-                        df = df.astype(str).replace({r'\s+': ' '}, regex=True)
+                        df = df.dropna(axis=1, how="all")
+                        df = df.astype(str).replace({r"\s+": " "}, regex=True)
                         table_text = df.head(10).to_csv(index=False)
                         cols = ", ".join(map(str, df.columns))
                     else:
@@ -444,9 +484,14 @@ class DataIngestionAgent:
                     table_text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]+", " ", table_text)
                     table_text = re.sub(r"\s+", " ", table_text).strip()
                 except Exception:
-                    table_text, cols = f"[table {table['table_id']} snapshot unavailable]", "unknown"
+                    table_text, cols = (
+                        f"[table {table['table_id']} snapshot unavailable]",
+                        "unknown",
+                    )
 
-                text_for_embed = f"TABLE ({table['table_id']}) on page {table['page']}. Columns: {cols}. Preview:\n{table_text}"
+                text_for_embed = (
+                    f"TABLE ({table['table_id']}) on page {table['page']}. Columns: {cols}. Preview:\n{table_text}"
+                )
                 h = sha1(text_for_embed)
                 if h not in self.dedupe_hashes:
                     self.dedupe_hashes.add(h)
@@ -460,7 +505,7 @@ class DataIngestionAgent:
                         "csv_path": table["csv_path"],
                         "html_path": table["html_path"],
                         "chunk_id": doc_id,
-                        "type": "table"
+                        "type": "table",
                     }
                     all_chunks_to_embed.append(text_for_embed)
                     all_metadatas.append(metadata)
@@ -470,7 +515,9 @@ class DataIngestionAgent:
             # Figures
             for fig in extracted["figures"]:
                 txt = fig.get("ocr_text", "")
-                text_for_embed = f"FIGURE ({fig['figure_id']}) on page {fig['page']}. OCR_text_preview: {txt[:1000]}"
+                text_for_embed = (
+                    f"FIGURE ({fig['figure_id']}) on page {fig['page']}. OCR_text_preview: {txt[:1000]}"
+                )
                 h = sha1(text_for_embed)
                 if h not in self.dedupe_hashes:
                     self.dedupe_hashes.add(h)
@@ -483,7 +530,7 @@ class DataIngestionAgent:
                         "figure_id": fig["figure_id"],
                         "image_path": fig.get("image_path"),
                         "chunk_id": doc_id,
-                        "type": "figure"
+                        "type": "figure",
                     }
                     all_chunks_to_embed.append(text_for_embed)
                     all_metadatas.append(metadata)
@@ -493,15 +540,17 @@ class DataIngestionAgent:
         # Add prev/next chunk ids in metadata
         for i, m in enumerate(all_metadatas):
             prev_id = all_metadatas[i - 1]["chunk_id"] if i > 0 else None
-            next_id = all_metadatas[i + 1]["chunk_id"] if i < len(all_metadatas) - 1 else None
+            next_id = (
+                all_metadatas[i + 1]["chunk_id"] if i < len(all_metadatas) - 1 else None
+            )
             m["prev_chunk_id"] = prev_id
             m["next_chunk_id"] = next_id
 
         # Batch embeddings and insert into Chroma
         for i in range(0, len(all_chunks_to_embed), BATCH_SIZE):
-            batch_texts = all_chunks_to_embed[i:i + BATCH_SIZE]
-            batch_ids = ids[i:i + BATCH_SIZE]
-            batch_metas = all_metadatas[i:i + BATCH_SIZE]
+            batch_texts = all_chunks_to_embed[i : i + BATCH_SIZE]
+            batch_ids = ids[i : i + BATCH_SIZE]
+            batch_metas = all_metadatas[i : i + BATCH_SIZE]
             embeddings = self.embedder.encode(batch_texts, show_progress_bar=False)
             embeddings_list = [emb.tolist() for emb in embeddings]
             batch_metadatas = self._sanitize_metadata(batch_metas)
@@ -509,22 +558,35 @@ class DataIngestionAgent:
                 ids=batch_ids,
                 documents=batch_texts,
                 metadatas=batch_metadatas,
-                embeddings=embeddings_list
+                embeddings=embeddings_list,
             )
 
         # Log ingestion
         ingest_id = sha1(str(pdf_path.resolve()) + fh)
-        cur.execute("""
-        INSERT OR REPLACE INTO ingests (id, file, file_hash, pages, chunks, meta)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """, (ingest_id, str(pdf_path.name), fh, len(extracted["page_texts"]), total_chunks, json.dumps({"drug": drug_name})))
+        cur.execute(
+            """
+            INSERT OR REPLACE INTO ingests (id, file, file_hash, pages, chunks, meta)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                ingest_id,
+                str(pdf_path.name),
+                fh,
+                len(extracted["page_texts"]),
+                total_chunks,
+                json.dumps({"drug": drug_name}),
+            ),
+        )
         conn.commit()
         conn.close()
         logger.info(f"Stored {total_chunks} docs from {pdf_path.name}")
 
+
 # =====================================
 # AGENT 2: RETRIEVAL AND QUERY ROUTING
 # =====================================
+
+
 class RetrievalQueryRoutingAgent:
     def __init__(self, collection, embedder):
         self.collection = collection
@@ -571,17 +633,19 @@ class RetrievalQueryRoutingAgent:
                 result["intent"] = "general"
             return result
         except Exception as e:
-            logger.warning(f"Entity extraction failed: {e} | Gemini response: {locals().get('response_text', '')}")
+            logger.warning(
+                f"Entity extraction failed: {e} | Gemini response: {locals().get('response_text', '')}"
+            )
             return {"drugs": [], "intent": "general"}
 
-    def vector_search(self, query: str, top_k: int = 8, filter_metadata: Optional[dict] = None) -> List[Dict]:
+    def vector_search(
+        self, query: str, top_k: int = 8, filter_metadata: Optional[dict] = None
+    ) -> List[Dict]:
         """Perform vector similarity search"""
         query_embedding = self.embedder.encode([query])[0].tolist()
         where = filter_metadata if filter_metadata else None
         results = self.collection.query(
-            query_embeddings=[query_embedding],
-            n_results=top_k,
-            where=where
+            query_embeddings=[query_embedding], n_results=top_k, where=where
         )
 
         docs = results.get("documents", [[]])[0]
@@ -591,21 +655,29 @@ class RetrievalQueryRoutingAgent:
         retrievals = []
         for doc, meta, dist in zip(docs, metas, distances):
             similarity = max(0.0, 1.0 - dist) if dist is not None else 0.0
-            citation = f"{meta.get('source_file', '')} (Page: {meta.get('page', '')}, Section: {meta.get('section', '')}, Type: {meta.get('type', '')})"
+            citation = (
+                f"{meta.get('source_file', '')} (Page: {meta.get('page', '')}, "
+                f"Section: {meta.get('section', '')}, Type: {meta.get('type', '')})"
+            )
 
-            retrievals.append({
-                "text": doc,
-                "metadata": meta,
-                "citation": citation,
-                "similarity": similarity,
-                "distance": dist
-            })
+            retrievals.append(
+                {
+                    "text": doc,
+                    "metadata": meta,
+                    "citation": citation,
+                    "similarity": similarity,
+                    "distance": dist,
+                }
+            )
 
         return retrievals
+
 
 # =====================================
 # AGENT 3: REASONING AND DOMAIN AGENT
 # =====================================
+
+
 class ReasoningDomainAgent:
     def __init__(self):
         self.model = genai.GenerativeModel(GEMINI_MODEL)
@@ -670,24 +742,39 @@ class ReasoningDomainAgent:
             return False
 
         # Simple heuristic: if we have high-confidence retrievals, relationships exist
-        avg_relevance = sum(r.get("relevance_score", 0) for r in retrievals) / len(retrievals)
+        avg_relevance = sum(r.get("relevance_score", 0) for r in retrievals) / len(
+            retrievals
+        )
         return avg_relevance >= CONFIDENCE_THRESHOLD
+
 
 # =====================================
 # AGENT 4: ORCHESTRATION & ANSWER GENERATION
 # =====================================
+<<<<<<< Updated upstream
 class AnswerGenerationAgent:
     def __init__(self):
         self.model = genai.GenerativeModel(GEMINI_MODEL)
 
     def generate_final_response(self, query: str, history: List[Dict], retrievals: List[Dict]) -> Dict[str, Any]:
+=======
+
+
+class AnswerGenerationAgent:
+    def __init__(self):
+        self.model = genai.GenerativeModel(GEMINI_MODEL)
+
+    def generate_final_response(
+        self, query: str, history: List[Dict], retrievals: List[Dict]
+    ) -> Dict[str, Any]:
+>>>>>>> Stashed changes
         """Generate final structured response using Gemini"""
         if not retrievals:
             return {
                 "short_answer": "I don't have sufficient information to answer your query.",
                 "confidence_score": 0.0,
                 "citations": [],
-                "reasoning": "No relevant information found in the knowledge base."
+                "reasoning": "No relevant information found in the knowledge base.",
             }
 
         # Build context from retrievals
@@ -696,15 +783,19 @@ class AnswerGenerationAgent:
 
         for i, retrieval in enumerate(retrievals):
             context_parts.append(f"Source {i+1}: {retrieval['text']}")
-            citations.append({
-                "source": retrieval["metadata"].get("source_file", ""),
-                "page_reference": str(retrieval["metadata"].get("page", "")),
-                "section_id": retrieval["metadata"].get("section", ""),
-                "relevance_score": retrieval.get("relevance_score", 0.0)
-            })
+            citations.append(
+                {
+                    "source": retrieval["metadata"].get("source_file", ""),
+                    "page_reference": str(retrieval["metadata"].get("page", "")),
+                    "section_id": retrieval["metadata"].get("section", ""),
+                    "relevance_score": retrieval.get("relevance_score", 0.0),
+                }
+            )
 
         context = "\n\n".join(context_parts)
-        history_text = "\n".join([f"{msg['role']}: {msg['content']}" for msg in history[-5:]])  # Last 5 messages
+        history_text = "\n".join(
+            [f"{msg['role']}: {msg['content']}" for msg in history[-5:]]
+        )  # Last 5 messages
 
         prompt = f"""
         You are a medical information assistant. Provide a structured response based ONLY on the provided context.
@@ -745,26 +836,30 @@ class AnswerGenerationAgent:
             final_response["citations"] = citations
 
             return final_response
-
         except Exception as e:
             logger.error(f"Answer generation failed: {e}")
             return {
                 "short_answer": "I encountered an error while processing your query. Please try rephrasing your question.",
                 "confidence_score": 0.0,
                 "citations": citations,
-                "reasoning": f"Error in answer generation: {str(e)}"
+                "reasoning": f"Error in answer generation: {str(e)}",
             }
+
 
 # =====================================
 # AGENT 5: SESSION MANAGEMENT
 # =====================================
+
+
 class SessionManagementAgent:
-    def __init__(self, host='localhost', port=6379, db=0):
+    def __init__(self, host="localhost", port=6379, db=0):
         try:
-            self.redis_client = redis.Redis(host=host, port=port, db=db, decode_responses=True)
+            self.redis_client = redis.Redis(
+                host=host, port=port, db=db, decode_responses=True
+            )
             self.redis_client.ping()  # Test connection
             self.use_redis = True
-        except:
+        except Exception:
             logger.warning("Redis not available, using session state fallback")
             self.use_redis = False
 
@@ -773,7 +868,7 @@ class SessionManagementAgent:
             try:
                 history_json = self.redis_client.get(session_id)
                 return json.loads(history_json) if history_json else []
-            except:
+            except Exception:
                 return []
         else:
             # Fallback to Streamlit session state
@@ -786,22 +881,29 @@ class SessionManagementAgent:
         if self.use_redis:
             try:
                 self.redis_client.set(session_id, json.dumps(history))
-            except:
+            except Exception:
                 pass  # Silent fail
         else:
             st.session_state[f"history_{session_id}"] = history
 
+
 # =====================================
 # MAIN ORCHESTRATOR
 # =====================================
+
+
 class DrugChatbotOrchestrator:
     def __init__(self):
         st.cache_resource.clear()
         with st.spinner("Initializing chatbot components..."):
             self.ingestion_agent = DataIngestionAgent()
             self.retrieval_agent = RetrievalQueryRoutingAgent(
+<<<<<<< Updated upstream
                 self.ingestion_agent.collection,
                 self.ingestion_agent.embedder
+=======
+                self.ingestion_agent.collection, self.ingestion_agent.embedder
+>>>>>>> Stashed changes
             )
             self.reasoning_agent = ReasoningDomainAgent()
             self.answer_agent = AnswerGenerationAgent()
@@ -812,26 +914,43 @@ class DrugChatbotOrchestrator:
                 "ingestion": Agent(
                     role="Ingestion Agent",
                     goal="Extract and chunk data from PDFs, including images and tables.",
+<<<<<<< Updated upstream
                     backstory="Handles all PDF ingestion and asset extraction."
+=======
+                    backstory="Handles all PDF ingestion and asset extraction.",
+>>>>>>> Stashed changes
                 ),
                 "retrieval": Agent(
                     role="Retrieval Agent",
                     goal="Perform vector search and entity extraction for queries.",
+<<<<<<< Updated upstream
                     backstory="Routes queries and retrieves relevant chunks."
+=======
+                    backstory="Routes queries and retrieves relevant chunks.",
+>>>>>>> Stashed changes
                 ),
                 "reasoning": Agent(
                     role="Reasoning Agent",
                     goal="Assess relevance and filter retrieved chunks.",
+<<<<<<< Updated upstream
                     backstory="Scores and filters chunks for answer generation."
+=======
+                    backstory="Scores and filters chunks for answer generation.",
+>>>>>>> Stashed changes
                 ),
                 "answer": Agent(
                     role="Answer Agent",
                     goal="Generate final structured medical answers.",
+<<<<<<< Updated upstream
                     backstory="Uses Gemini to generate answers from context."
+=======
+                    backstory="Uses Gemini to generate answers from context.",
+>>>>>>> Stashed changes
                 ),
                 "session": Agent(
                     role="Session Agent",
                     goal="Manage user session and chat history.",
+<<<<<<< Updated upstream
                     backstory="Handles session state and history."
                 )
             }
@@ -840,12 +959,19 @@ class DrugChatbotOrchestrator:
                 agents=list(self.crew_agents.values()),
                 tasks=[]
             )
+=======
+                    backstory="Handles session state and history.",
+                ),
+            }
+
+            self.crew = Crew(agents=list(self.crew_agents.values()), tasks=[])
+>>>>>>> Stashed changes
 
     def ingest_pdfs(self):
         pdf_files = {
             "Humira": "humira.pdf",
             "Rinvoq": "rinvoq_pi.pdf",
-            "Skyrizi": "skyrizi_pi.pdf"
+            "Skyrizi": "skyrizi_pi.pdf",
         }
         for drug_name, filename in pdf_files.items():
             pdf_path = PDF_DIR / filename
@@ -855,10 +981,19 @@ class DrugChatbotOrchestrator:
                     task = Task(
                         description=f"Ingest PDF {filename} for drug {drug_name}",
                         agent=self.crew_agents["ingestion"],
+<<<<<<< Updated upstream
                         expected_output="PDF ingested and assets extracted."
                     )
                     self.crew.tasks.append(task)
                     logger.info(f"Calling agent: {self.crew_agents['ingestion'].role}")
+=======
+                        expected_output="PDF ingested and assets extracted.",
+                    )
+                    self.crew.tasks.append(task)
+                    logger.info(
+                        f"Calling agent: {self.crew_agents['ingestion'].role}"
+                    )
+>>>>>>> Stashed changes
                     self.ingestion_agent.ingest_pdf(pdf_path, drug_name)
                     st.success(f"✅ Ingested {filename}")
                 except Exception as e:
@@ -871,31 +1006,55 @@ class DrugChatbotOrchestrator:
         entities_task = Task(
             description="Extract entities from user query.",
             agent=self.crew_agents["retrieval"],
+<<<<<<< Updated upstream
             expected_output="Entities extracted."
+=======
+            expected_output="Entities extracted.",
+>>>>>>> Stashed changes
         )
         retrieval_task = Task(
             description="Perform vector search for query.",
             agent=self.crew_agents["retrieval"],
+<<<<<<< Updated upstream
             expected_output="Relevant chunks retrieved."
+=======
+            expected_output="Relevant chunks retrieved.",
+>>>>>>> Stashed changes
         )
         reasoning_task = Task(
             description="Assess relevance of retrieved chunks.",
             agent=self.crew_agents["reasoning"],
+<<<<<<< Updated upstream
             expected_output="Chunks filtered by relevance."
+=======
+            expected_output="Chunks filtered by relevance.",
+>>>>>>> Stashed changes
         )
         answer_task = Task(
             description="Generate final answer from filtered chunks.",
             agent=self.crew_agents["answer"],
+<<<<<<< Updated upstream
             expected_output="Structured answer generated."
+=======
+            expected_output="Structured answer generated.",
+>>>>>>> Stashed changes
         )
         session_task = Task(
             description="Update and retrieve session history.",
             agent=self.crew_agents["session"],
+<<<<<<< Updated upstream
             expected_output="Session history managed."
         )
         self.crew.tasks.extend([
             entities_task, retrieval_task, reasoning_task, answer_task, session_task
         ])
+=======
+            expected_output="Session history managed.",
+        )
+        self.crew.tasks.extend(
+            [entities_task, retrieval_task, reasoning_task, answer_task, session_task]
+        )
+>>>>>>> Stashed changes
 
         # Step 1: Entity Recognition
         logger.info(f"Calling agent: {self.crew_agents['retrieval'].role}")
@@ -913,11 +1072,23 @@ class DrugChatbotOrchestrator:
 
         # Step 3: Reasoning and Filtering
         logger.info(f"Calling agent: {self.crew_agents['reasoning'].role}")
+<<<<<<< Updated upstream
         filtered_retrievals = self.reasoning_agent.assess_chunk_relevance(query, retrievals)
 
         # Step 4: Check if sufficient information exists
         logger.info(f"Calling agent: {self.crew_agents['reasoning'].role}")
         has_sufficient_info = self.reasoning_agent.check_relationships_exist(filtered_retrievals, query)
+=======
+        filtered_retrievals = self.reasoning_agent.assess_chunk_relevance(
+            query, retrievals
+        )
+
+        # Step 4: Check if sufficient information exists
+        logger.info(f"Calling agent: {self.crew_agents['reasoning'].role}")
+        has_sufficient_info = self.reasoning_agent.check_relationships_exist(
+            filtered_retrievals, query
+        )
+>>>>>>> Stashed changes
 
         if not has_sufficient_info:
             return {
@@ -925,29 +1096,42 @@ class DrugChatbotOrchestrator:
                 "confidence_score": 0.0,
                 "citations": [],
                 "reasoning": "Insufficient relevant information in knowledge base.",
-                "entities_found": entities
+                "entities_found": entities,
             }
 
         # Step 5: Generate Final Answer
         logger.info(f"Calling agent: {self.crew_agents['answer'].role}")
         history = self.session_agent.get_history(session_id)
+<<<<<<< Updated upstream
         response = self.answer_agent.generate_final_response(query, history, filtered_retrievals[:4])
+=======
+        response = self.answer_agent.generate_final_response(
+            query, history, filtered_retrievals[:4]
+        )
+>>>>>>> Stashed changes
         response["entities_found"] = entities
 
         return response
 
+
 # =====================================
 # STREAMLIT UI
 # =====================================
+
+
 def main():
-    st.set_page_config(page_title="Drug Information Chatbot", page_icon="💊", layout="wide")
+    st.set_page_config(
+        page_title="Drug Information Chatbot", page_icon="💊", layout="wide"
+    )
 
     st.title("💊 Drug Information Chatbot")
     st.caption("RAG-powered medical information assistant using Gemini AI")
 
     # Initialize session state
     if "session_id" not in st.session_state:
-        st.session_state.session_id = f"session_{int(time.time())}_{uuid4().hex[:8]}"
+        st.session_state.session_id = (
+            f"session_{int(time.time())}_{uuid4().hex[:8]}"
+        )
 
     if "orchestrator" not in st.session_state:
         try:
@@ -972,7 +1156,9 @@ def main():
         st.info(f"**Session ID:** {st.session_state.session_id}")
 
         if st.button("🗑️ Clear History"):
-            orchestrator.session_agent.update_history(st.session_state.session_id, "system", "History cleared")
+            orchestrator.session_agent.update_history(
+                st.session_state.session_id, "system", "History cleared"
+            )
             st.rerun()
 
     # Main chat interface
@@ -986,12 +1172,20 @@ def main():
             st.markdown(message["content"])
 
     # Query input
-    if query := st.chat_input("Ask about drug information (e.g., 'What are the side effects of Humira?')"):
+    if query := st.chat_input(
+        "Ask about drug information (e.g., 'What are the side effects of Humira?')"
+    ):
         # Display user message
         with st.chat_message("user"):
             st.markdown(query)
 
+<<<<<<< Updated upstream
         orchestrator.session_agent.update_history(st.session_state.session_id, "user", query)
+=======
+        orchestrator.session_agent.update_history(
+            st.session_state.session_id, "user", query
+        )
+>>>>>>> Stashed changes
 
         # Process query
         with st.chat_message("assistant"):
@@ -1018,11 +1212,23 @@ def main():
 
                 # Step 3: Reasoning and Filtering
                 agent_status.info("Current running agent: Reasoning Agent")
+<<<<<<< Updated upstream
                 filtered_retrievals = orchestrator.reasoning_agent.assess_chunk_relevance(query, retrievals)
 
                 # Step 4: Check if sufficient information exists
                 agent_status.info("Current running agent: Reasoning Agent")
                 has_sufficient_info = orchestrator.reasoning_agent.check_relationships_exist(filtered_retrievals, query)
+=======
+                filtered_retrievals = orchestrator.reasoning_agent.assess_chunk_relevance(
+                    query, retrievals
+                )
+
+                # Step 4: Check if sufficient information exists
+                agent_status.info("Current running agent: Reasoning Agent")
+                has_sufficient_info = orchestrator.reasoning_agent.check_relationships_exist(
+                    filtered_retrievals, query
+                )
+>>>>>>> Stashed changes
 
                 if not has_sufficient_info:
                     response = {
@@ -1030,48 +1236,96 @@ def main():
                         "confidence_score": 0.0,
                         "citations": [],
                         "reasoning": "Insufficient relevant information in knowledge base.",
-                        "entities_found": entities
+                        "entities_found": entities,
                     }
                 else:
                     # Step 5: Generate Final Answer
                     agent_status.info("Current running agent: Answer Agent")
+<<<<<<< Updated upstream
                     history = orchestrator.session_agent.get_history(st.session_state.session_id)
                     response = orchestrator.answer_agent.generate_final_response(query, history, filtered_retrievals[:4])
+=======
+                    history = orchestrator.session_agent.get_history(
+                        st.session_state.session_id
+                    )
+                    response = orchestrator.answer_agent.generate_final_response(
+                        query, history, filtered_retrievals[:4]
+                    )
+>>>>>>> Stashed changes
                     response["entities_found"] = entities
             agent_status.empty()
 
             # Display the full process in expandable sections
             with st.expander("🔍 **Full Analysis Process**", expanded=False):
                 st.subheader("1. Entity Extraction (Agent: Retrieval)")
+<<<<<<< Updated upstream
                 st.info(f"Agent called: Retrieval Agent")
                 st.json(entities)
 
                 st.subheader("2. Vector Search Results (Agent: Retrieval)")
                 st.info(f"Agent called: Retrieval Agent")
+=======
+                st.info("Agent called: Retrieval Agent")
+                st.json(entities)
+
+                st.subheader("2. Vector Search Results (Agent: Retrieval)")
+                st.info("Agent called: Retrieval Agent")
+>>>>>>> Stashed changes
                 for i, retrieval in enumerate(retrievals):
                     st.markdown(f"**Retrieval {i+1}**")
                     st.markdown(f"- **Text:** {retrieval['text'][:200]}...")
-                    st.markdown(f"- **Source:** {retrieval['metadata'].get('source_file', 'Unknown')}")
-                    st.markdown(f"- **Page:** {retrieval['metadata'].get('page', 'N/A')}")
-                    st.markdown(f"- **Section:** {retrieval['metadata'].get('section', 'N/A')}")
+                    st.markdown(
+                        f"- **Source:** {retrieval['metadata'].get('source_file', 'Unknown')}"
+                    )
+                    st.markdown(
+                        f"- **Page:** {retrieval['metadata'].get('page', 'N/A')}"
+                    )
+                    st.markdown(
+                        f"- **Section:** {retrieval['metadata'].get('section', 'N/A')}"
+                    )
                     st.markdown(f"- **Similarity:** {retrieval['similarity']:.2f}")
                     st.markdown("---")
 
+<<<<<<< Updated upstream
                 st.subheader("3. Filtered Retrievals (Relevance Scored) (Agent: Reasoning)")
                 st.info(f"Agent called: Reasoning Agent")
+=======
+                st.subheader(
+                    "3. Filtered Retrievals (Relevance Scored) (Agent: Reasoning)"
+                )
+                st.info("Agent called: Reasoning Agent")
+>>>>>>> Stashed changes
                 for i, retrieval in enumerate(filtered_retrievals):
                     st.markdown(f"**Filtered Retrieval {i+1}**")
                     st.markdown(f"- **Text:** {retrieval['text'][:200]}...")
-                    st.markdown(f"- **Relevance Score:** {retrieval.get('relevance_score', 0.0):.2f}")
-                    st.markdown(f"- **Source:** {retrieval['metadata'].get('source_file', 'Unknown')}")
-                    st.markdown(f"- **Page:** {retrieval['metadata'].get('page', 'N/A')}")
-                    st.markdown(f"- **Section:** {retrieval['metadata'].get('section', 'N/A')}")
+                    st.markdown(
+                        f"- **Relevance Score:** {retrieval.get('relevance_score', 0.0):.2f}"
+                    )
+                    st.markdown(
+                        f"- **Source:** {retrieval['metadata'].get('source_file', 'Unknown')}"
+                    )
+                    st.markdown(
+                        f"- **Page:** {retrieval['metadata'].get('page', 'N/A')}"
+                    )
+                    st.markdown(
+                        f"- **Section:** {retrieval['metadata'].get('section', 'N/A')}"
+                    )
                     st.markdown("---")
 
                 st.subheader("4. Final Answer Generation (Agent: Answer)")
+<<<<<<< Updated upstream
                 st.info(f"Agent called: Answer Agent")
                 st.markdown(f"- **Confidence:** {response.get('confidence_score', 0.0):.2f}")
                 st.markdown(f"- **Reasoning:** {response.get('reasoning', 'No reasoning provided')}")
+=======
+                st.info("Agent called: Answer Agent")
+                st.markdown(
+                    f"- **Confidence:** {response.get('confidence_score', 0.0):.2f}"
+                )
+                st.markdown(
+                    f"- **Reasoning:** {response.get('reasoning', 'No reasoning provided')}"
+                )
+>>>>>>> Stashed changes
 
             # Format and display the final response
 >>>>>>> Stashed changes
@@ -1083,13 +1337,27 @@ def main():
             **Reasoning:** {response.get('reasoning', 'No reasoning provided')}
             """
 
+<<<<<<< Updated upstream
             if response.get('citations'):
+=======
+            if response.get("citations"):
+>>>>>>> Stashed changes
                 formatted_response += "\n\n**Sources:**\n"
-                for i, citation in enumerate(response['citations'], 1):
+                for i, citation in enumerate(response["citations"], 1):
                     formatted_response += f"{i}. {citation.get('source', 'Unknown')} "
-                    formatted_response += f"(Page: {citation.get('page_reference', 'N/A')}, "
-                    formatted_response += f"Section: {citation.get('section_id', 'N/A')}, "
-                    formatted_response += f"Relevance: {citation.get('relevance_score', 0.0):.2f})\n"
+                    formatted_response += (
+                        f"(Page: {citation.get('page_reference', 'N/A')}, "
+                    )
+                    formatted_response += (
+                        f"Section: {citation.get('section_id', 'N/A')}, "
+                    )
+                    formatted_response += (
+                        f"Relevance: {citation.get('relevance_score', 0.0):.2f})\n"
+                    )
+
+            if response.get("entities_found"):
+                with st.expander("🔍 Entity Analysis"):
+                    st.json(response["entities_found"])
 
             if response.get('entities_found'):
                 with st.expander("🔍 Entity Analysis"):
@@ -1099,10 +1367,9 @@ def main():
 
         # Update history with response
         orchestrator.session_agent.update_history(
-            st.session_state.session_id,
-            "assistant",
-            formatted_response
+            st.session_state.session_id, "assistant", formatted_response
         )
+
 
 if __name__ == "__main__":
     main()
