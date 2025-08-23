@@ -3,8 +3,11 @@ Complete RAG-based Drug Information Chatbot
 Integrates all agents: Ingestion, Retrieval, Reasoning, and Answer Generation
 Uses Gemini API instead of OpenAI, with confidence-based filtering
 Improved PDF extraction: tables, figures, OCR, and heading detection
+
 """
 import streamlit as st
+# Crew AI imports
+from crewai import Crew, Agent, Task
 import os
 import re
 import hashlib
@@ -793,9 +796,7 @@ class SessionManagementAgent:
 # =====================================
 class DrugChatbotOrchestrator:
     def __init__(self):
-        # Initialize agents
-        st.cache_resource.clear()  # Clear any cached resources
-
+        st.cache_resource.clear()
         with st.spinner("Initializing chatbot components..."):
             self.ingestion_agent = DataIngestionAgent()
             self.retrieval_agent = RetrievalQueryRoutingAgent(
@@ -806,18 +807,58 @@ class DrugChatbotOrchestrator:
             self.answer_agent = AnswerGenerationAgent()
             self.session_agent = SessionManagementAgent()
 
+            # Crew AI agent wrappers
+            self.crew_agents = {
+                "ingestion": Agent(
+                    role="Ingestion Agent",
+                    goal="Extract and chunk data from PDFs, including images and tables.",
+                    backstory="Handles all PDF ingestion and asset extraction."
+                ),
+                "retrieval": Agent(
+                    role="Retrieval Agent",
+                    goal="Perform vector search and entity extraction for queries.",
+                    backstory="Routes queries and retrieves relevant chunks."
+                ),
+                "reasoning": Agent(
+                    role="Reasoning Agent",
+                    goal="Assess relevance and filter retrieved chunks.",
+                    backstory="Scores and filters chunks for answer generation."
+                ),
+                "answer": Agent(
+                    role="Answer Agent",
+                    goal="Generate final structured medical answers.",
+                    backstory="Uses Gemini to generate answers from context."
+                ),
+                "session": Agent(
+                    role="Session Agent",
+                    goal="Manage user session and chat history.",
+                    backstory="Handles session state and history."
+                )
+            }
+
+            self.crew = Crew(
+                agents=list(self.crew_agents.values()),
+                tasks=[]
+            )
+
     def ingest_pdfs(self):
-        """Ingest PDFs if they exist"""
         pdf_files = {
             "Humira": "humira.pdf",
             "Rinvoq": "rinvoq_pi.pdf",
             "Skyrizi": "skyrizi_pi.pdf"
         }
-
         for drug_name, filename in pdf_files.items():
             pdf_path = PDF_DIR / filename
             if pdf_path.exists():
                 try:
+                    # Crew AI task for ingestion
+                    task = Task(
+                        description=f"Ingest PDF {filename} for drug {drug_name}",
+                        agent=self.crew_agents["ingestion"],
+                        expected_output="PDF ingested and assets extracted."
+                    )
+                    self.crew.tasks.append(task)
+                    logger.info(f"Calling agent: {self.crew_agents['ingestion'].role}")
                     self.ingestion_agent.ingest_pdf(pdf_path, drug_name)
                     st.success(f"✅ Ingested {filename}")
                 except Exception as e:
@@ -826,25 +867,56 @@ class DrugChatbotOrchestrator:
                 st.warning(f"⚠️ {filename} not found in {PDF_DIR}")
 
     def process_query(self, query: str, session_id: str) -> Dict[str, Any]:
-        """Main orchestration logic"""
+        # Crew AI tasks for orchestration
+        entities_task = Task(
+            description="Extract entities from user query.",
+            agent=self.crew_agents["retrieval"],
+            expected_output="Entities extracted."
+        )
+        retrieval_task = Task(
+            description="Perform vector search for query.",
+            agent=self.crew_agents["retrieval"],
+            expected_output="Relevant chunks retrieved."
+        )
+        reasoning_task = Task(
+            description="Assess relevance of retrieved chunks.",
+            agent=self.crew_agents["reasoning"],
+            expected_output="Chunks filtered by relevance."
+        )
+        answer_task = Task(
+            description="Generate final answer from filtered chunks.",
+            agent=self.crew_agents["answer"],
+            expected_output="Structured answer generated."
+        )
+        session_task = Task(
+            description="Update and retrieve session history.",
+            agent=self.crew_agents["session"],
+            expected_output="Session history managed."
+        )
+        self.crew.tasks.extend([
+            entities_task, retrieval_task, reasoning_task, answer_task, session_task
+        ])
+
         # Step 1: Entity Recognition
+        logger.info(f"Calling agent: {self.crew_agents['retrieval'].role}")
         entities = self.retrieval_agent.extract_entities(query)
 
         # Step 2: Vector Search
         filter_metadata = None
         if entities.get("drugs"):
-            # Filter by drug if specific drugs mentioned
             drug_filter = {"drug": {"$in": entities["drugs"]}}
             filter_metadata = drug_filter
-
+        logger.info(f"Calling agent: {self.crew_agents['retrieval'].role}")
         retrievals = self.retrieval_agent.vector_search(
             query, top_k=8, filter_metadata=filter_metadata
         )
 
         # Step 3: Reasoning and Filtering
+        logger.info(f"Calling agent: {self.crew_agents['reasoning'].role}")
         filtered_retrievals = self.reasoning_agent.assess_chunk_relevance(query, retrievals)
 
         # Step 4: Check if sufficient information exists
+        logger.info(f"Calling agent: {self.crew_agents['reasoning'].role}")
         has_sufficient_info = self.reasoning_agent.check_relationships_exist(filtered_retrievals, query)
 
         if not has_sufficient_info:
@@ -857,6 +929,7 @@ class DrugChatbotOrchestrator:
             }
 
         # Step 5: Generate Final Answer
+        logger.info(f"Calling agent: {self.crew_agents['answer'].role}")
         history = self.session_agent.get_history(session_id)
         response = self.answer_agent.generate_final_response(query, history, filtered_retrievals[:4])
         response["entities_found"] = entities
@@ -922,10 +995,86 @@ def main():
 
         # Process query
         with st.chat_message("assistant"):
+            agent_status = st.empty()
             with st.spinner("Processing your query..."):
+<<<<<<< Updated upstream
                 response = orchestrator.process_query(query, st.session_state.session_id)
 
             # Format response
+=======
+                # Step 1: Entity Recognition
+                agent_status.info("Current running agent: Retrieval Agent")
+                entities = orchestrator.retrieval_agent.extract_entities(query)
+
+                # Step 2: Vector Search
+                agent_status.info("Current running agent: Retrieval Agent")
+                filter_metadata = None
+                if entities.get("drugs"):
+                    drug_filter = {"drug": {"$in": entities["drugs"]}}
+                    filter_metadata = drug_filter
+                retrievals = orchestrator.retrieval_agent.vector_search(
+                    query, top_k=8, filter_metadata=filter_metadata
+                )
+
+                # Step 3: Reasoning and Filtering
+                agent_status.info("Current running agent: Reasoning Agent")
+                filtered_retrievals = orchestrator.reasoning_agent.assess_chunk_relevance(query, retrievals)
+
+                # Step 4: Check if sufficient information exists
+                agent_status.info("Current running agent: Reasoning Agent")
+                has_sufficient_info = orchestrator.reasoning_agent.check_relationships_exist(filtered_retrievals, query)
+
+                if not has_sufficient_info:
+                    response = {
+                        "short_answer": "I don't have sufficient relevant information to answer your query based on the available documents.",
+                        "confidence_score": 0.0,
+                        "citations": [],
+                        "reasoning": "Insufficient relevant information in knowledge base.",
+                        "entities_found": entities
+                    }
+                else:
+                    # Step 5: Generate Final Answer
+                    agent_status.info("Current running agent: Answer Agent")
+                    history = orchestrator.session_agent.get_history(st.session_state.session_id)
+                    response = orchestrator.answer_agent.generate_final_response(query, history, filtered_retrievals[:4])
+                    response["entities_found"] = entities
+            agent_status.empty()
+
+            # Display the full process in expandable sections
+            with st.expander("🔍 **Full Analysis Process**", expanded=False):
+                st.subheader("1. Entity Extraction (Agent: Retrieval)")
+                st.info(f"Agent called: Retrieval Agent")
+                st.json(entities)
+
+                st.subheader("2. Vector Search Results (Agent: Retrieval)")
+                st.info(f"Agent called: Retrieval Agent")
+                for i, retrieval in enumerate(retrievals):
+                    st.markdown(f"**Retrieval {i+1}**")
+                    st.markdown(f"- **Text:** {retrieval['text'][:200]}...")
+                    st.markdown(f"- **Source:** {retrieval['metadata'].get('source_file', 'Unknown')}")
+                    st.markdown(f"- **Page:** {retrieval['metadata'].get('page', 'N/A')}")
+                    st.markdown(f"- **Section:** {retrieval['metadata'].get('section', 'N/A')}")
+                    st.markdown(f"- **Similarity:** {retrieval['similarity']:.2f}")
+                    st.markdown("---")
+
+                st.subheader("3. Filtered Retrievals (Relevance Scored) (Agent: Reasoning)")
+                st.info(f"Agent called: Reasoning Agent")
+                for i, retrieval in enumerate(filtered_retrievals):
+                    st.markdown(f"**Filtered Retrieval {i+1}**")
+                    st.markdown(f"- **Text:** {retrieval['text'][:200]}...")
+                    st.markdown(f"- **Relevance Score:** {retrieval.get('relevance_score', 0.0):.2f}")
+                    st.markdown(f"- **Source:** {retrieval['metadata'].get('source_file', 'Unknown')}")
+                    st.markdown(f"- **Page:** {retrieval['metadata'].get('page', 'N/A')}")
+                    st.markdown(f"- **Section:** {retrieval['metadata'].get('section', 'N/A')}")
+                    st.markdown("---")
+
+                st.subheader("4. Final Answer Generation (Agent: Answer)")
+                st.info(f"Agent called: Answer Agent")
+                st.markdown(f"- **Confidence:** {response.get('confidence_score', 0.0):.2f}")
+                st.markdown(f"- **Reasoning:** {response.get('reasoning', 'No reasoning provided')}")
+
+            # Format and display the final response
+>>>>>>> Stashed changes
             formatted_response = f"""
             **Answer:** {response.get('short_answer', 'No answer available')}
 
