@@ -984,7 +984,7 @@ class DrugChatbotOrchestrator:
 def main():
     st.set_page_config(page_title="Drug Information Chatbot", page_icon="💊", layout="wide")
     st.title("💊 Drug Information Chatbot")
-    st.caption("RAG-powered medical information assistant using Gemini AI")
+    st.caption("RAG-powered medical information assistant using Agentic AI")
 
     if "session_id" not in st.session_state:
         st.session_state.session_id = f"session_{int(time.time())}_{uuid4().hex[:8]}"
@@ -1074,30 +1074,41 @@ def main():
                 
                 # Use the orchestrator's process_query method for proper logging and flow
                 try:
-                    response = orchestrator.process_query(query, st.session_state.session_id)
-                except Exception as e:
-                    logger.error(f"Error in process_query: {e}")
-                    # Fallback to manual processing
-                    agent_status.info("Current running agent: Retrieval Agent")
+                    # Show initial processing status
+                    agent_status.info("🤖 **Initializing Multi-Agent System...**")
+                    time.sleep(0.5)
+                    
+                    agent_status.info("🔍 **Retrieval Agent:** Extracting entities from query...")
                     entities = orchestrator.retrieval_agent.extract_entities(query, st.session_state.session_id)
+                    time.sleep(0.3)
                     
-                    if is_personalized and user_info:
-                        print(f"Enhanced query for personalized question: {enhanced_query}")
-                    
-                    agent_status.info("Current running agent: Retrieval Agent")
+                    # Construct filter metadata
                     filter_metadata = None
                     if entities.get("drugs"):
-                        # Use proper $in operator for ChromaDB
                         filter_metadata = {"drug": {"$in": entities["drugs"]}}
+                        agent_status.info(f"🎯 **Retrieval Agent:** Found drugs: {', '.join(entities['drugs'])}")
+                        time.sleep(0.3)
+                    
+                    if is_personalized and user_info:
+                        agent_status.info("👤 **Retrieval Agent:** Enhancing query with user context...")
+                        time.sleep(0.3)
+                    
+                    agent_status.info("🔍 **Retrieval Agent:** Performing vector similarity search...")
                     retrievals = orchestrator.retrieval_agent.vector_search(
                         enhanced_query, top_k=8, filter_metadata=filter_metadata
                     )
+                    time.sleep(0.5)
                     
-                    agent_status.info("Current running agent: Reasoning Agent")
+                    agent_status.info(f"📊 **Reasoning Agent:** Analyzing {len(retrievals)} retrieved chunks...")
                     filtered_retrievals = orchestrator.reasoning_agent.assess_chunk_relevance(query, retrievals)
-                    agent_status.info("Current running agent: Reasoning Agent")
+                    time.sleep(0.5)
+                    
+                    agent_status.info("🧠 **Reasoning Agent:** Checking information sufficiency...")
                     has_sufficient_info = orchestrator.reasoning_agent.check_relationships_exist(filtered_retrievals, query)
+                    time.sleep(0.3)
+                    
                     if not has_sufficient_info:
+                        agent_status.warning("⚠️ **Reasoning Agent:** Insufficient relevant information found")
                         response = {
                             "short_answer": "I don't have sufficient relevant information to answer your query based on the available documents.",
                             "confidence_score": 0.0,
@@ -1106,17 +1117,75 @@ def main():
                             "entities_found": entities
                         }
                     else:
-                        agent_status.info("Current running agent: Answer Agent")
+                        agent_status.info(f"✅ **Reasoning Agent:** Found {len(filtered_retrievals)} relevant chunks")
+                        time.sleep(0.3)
+                        
+                        agent_status.info("💬 **Answer Agent:** Generating structured response...")
+                        response = orchestrator.answer_agent.generate_final_response(
+                            query, st.session_state.session_id, filtered_retrievals[:4], user_context
+                        )
+                        response["entities_found"] = entities
+                        time.sleep(0.5)
+                        
+                        agent_status.success("🎉 **Answer Agent:** Response generated successfully!")
+                        time.sleep(0.3)
+                        
+                except Exception as e:
+                    logger.error(f"Error in process_query: {e}")
+                    agent_status.error(f"❌ **System Error:** {str(e)}")
+                    time.sleep(0.5)
+                    
+                    # Fallback to manual processing with status updates
+                    agent_status.info("🔄 **System:** Switching to fallback processing...")
+                    entities = orchestrator.retrieval_agent.extract_entities(query, st.session_state.session_id)
+                    
+                    if is_personalized and user_info:
+                        agent_status.info("👤 **Fallback:** Applying user context...")
+                        print(f"Enhanced query for personalized question: {enhanced_query}")
+                    
+                    agent_status.info("🔍 **Fallback:** Performing vector search...")
+                    filter_metadata = None
+                    if entities.get("drugs"):
+                        filter_metadata = {"drug": {"$in": entities["drugs"]}}
+                    retrievals = orchestrator.retrieval_agent.vector_search(
+                        enhanced_query, top_k=8, filter_metadata=filter_metadata
+                    )
+                    
+                    agent_status.info("🧠 **Fallback:** Assessing chunk relevance...")
+                    filtered_retrievals = orchestrator.reasoning_agent.assess_chunk_relevance(query, retrievals)
+                    has_sufficient_info = orchestrator.reasoning_agent.check_relationships_exist(filtered_retrievals, query)
+                    
+                    if not has_sufficient_info:
+                        agent_status.warning("⚠️ **Fallback:** Insufficient information")
+                        response = {
+                            "short_answer": "I don't have sufficient relevant information to answer your query based on the available documents.",
+                            "confidence_score": 0.0,
+                            "citations": [],
+                            "reasoning": "Insufficient relevant information in knowledge base.",
+                            "entities_found": entities
+                        }
+                    else:
+                        agent_status.info("💬 **Fallback:** Generating answer...")
                         response = orchestrator.answer_agent.generate_final_response(
                             query, st.session_state.session_id, filtered_retrievals[:4]
                         )
                         response["entities_found"] = entities
+                        agent_status.success("✅ **Fallback:** Processing completed")
                         
                 # Extract data for debugging display
                 entities = response.get("entities_found", {})
-                retrievals = []
-                filtered_retrievals = []
                 
+                # Final status update
+                confidence = response.get('confidence_score', 0.0)
+                if confidence >= 0.8:
+                    agent_status.success(f"🎯 **Complete:** High confidence response ({confidence:.2f})")
+                elif confidence >= 0.6:
+                    agent_status.info(f"✅ **Complete:** Medium confidence response ({confidence:.2f})")
+                else:
+                    agent_status.warning(f"⚠️ **Complete:** Low confidence response ({confidence:.2f})")
+                    
+            # Clear the agent status after a brief display
+            time.sleep(2)
             agent_status.empty()
             
             # Display debug information
@@ -1130,26 +1199,32 @@ def main():
                 st.subheader("1. Entity Extraction (Agent: Retrieval)")
                 st.info("Agent called: Retrieval Agent")
                 st.json(entities)
-                st.subheader("2. Vector Search Results (Agent: Retrieval)")
-                st.info("Agent called: Retrieval Agent")
-                for i, retrieval in enumerate(retrievals):
-                    st.markdown(f"**Retrieval {i+1}**")
-                    st.markdown(f"- **Text:** {retrieval['text'][:200]}...")
-                    st.markdown(f"- **Source:** {retrieval['metadata'].get('source_file', 'Unknown')}")
-                    st.markdown(f"- **Page:** {retrieval['metadata'].get('page', 'N/A')}")
-                    st.markdown(f"- **Section:** {retrieval['metadata'].get('section', 'N/A')}")
-                    st.markdown(f"- **Similarity:** {retrieval['similarity']:.2f}")
-                    st.markdown("---")
-                st.subheader("3. Filtered Retrievals (Relevance Scored) (Agent: Reasoning)")
-                st.info("Agent called: Reasoning Agent")
-                for i, retrieval in enumerate(filtered_retrievals):
-                    st.markdown(f"**Filtered Retrieval {i+1}**")
-                    st.markdown(f"- **Text:** {retrieval['text'][:200]}...")
-                    st.markdown(f"- **Relevance Score:** {retrieval.get('relevance_score', 0.0):.2f}")
-                    st.markdown(f"- **Source:** {retrieval['metadata'].get('source_file', 'Unknown')}")
-                    st.markdown(f"- **Page:** {retrieval['metadata'].get('page', 'N/A')}")
-                    st.markdown(f"- **Section:** {retrieval['metadata'].get('section', 'N/A')}")
-                    st.markdown("---")
+                
+                # Only show retrievals if we have them (from successful processing)
+                if 'retrievals' in locals():
+                    st.subheader("2. Vector Search Results (Agent: Retrieval)")
+                    st.info("Agent called: Retrieval Agent")
+                    for i, retrieval in enumerate(retrievals):
+                        st.markdown(f"**Retrieval {i+1}**")
+                        st.markdown(f"- **Text:** {retrieval['text'][:200]}...")
+                        st.markdown(f"- **Source:** {retrieval['metadata'].get('source_file', 'Unknown')}")
+                        st.markdown(f"- **Page:** {retrieval['metadata'].get('page', 'N/A')}")
+                        st.markdown(f"- **Section:** {retrieval['metadata'].get('section', 'N/A')}")
+                        st.markdown(f"- **Similarity:** {retrieval['similarity']:.2f}")
+                        st.markdown("---")
+                        
+                if 'filtered_retrievals' in locals():
+                    st.subheader("3. Filtered Retrievals (Relevance Scored) (Agent: Reasoning)")
+                    st.info("Agent called: Reasoning Agent")
+                    for i, retrieval in enumerate(filtered_retrievals):
+                        st.markdown(f"**Filtered Retrieval {i+1}**")
+                        st.markdown(f"- **Text:** {retrieval['text'][:200]}...")
+                        st.markdown(f"- **Relevance Score:** {retrieval.get('relevance_score', 0.0):.2f}")
+                        st.markdown(f"- **Source:** {retrieval['metadata'].get('source_file', 'Unknown')}")
+                        st.markdown(f"- **Page:** {retrieval['metadata'].get('page', 'N/A')}")
+                        st.markdown(f"- **Section:** {retrieval['metadata'].get('section', 'N/A')}")
+                        st.markdown("---")
+                        
                 st.subheader("4. Final Answer Generation (Agent: Answer)")
                 st.info("Agent called: Answer Agent")
                 st.markdown(f"- **Confidence:** {response.get('confidence_score', 0.0):.2f}")
