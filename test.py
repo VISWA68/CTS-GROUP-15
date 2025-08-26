@@ -874,28 +874,26 @@ class DrugChatbotOrchestrator:
             )
 
     def ingest_pdfs(self):
-        pdf_files = {
-            "Humira": "humira.pdf",
-            "Rinvoq": "rinvoq_pi.pdf",
-            "Skyrizi": "skyrizi_pi.pdf"
-        }
-        for drug_name, filename in pdf_files.items():
-            pdf_path = PDF_DIR / filename
-            if pdf_path.exists():
-                try:
-                    task = Task(
-                        description=f"Ingest PDF {filename} for drug {drug_name}",
-                        agent=self.crew_agents["ingestion"],
-                        expected_output="PDF ingested and assets extracted."
-                    )
-                    self.crew.tasks.append(task)
-                    logger.info(f"Calling agent: {self.crew_agents['ingestion'].role}")
-                    self.ingestion_agent.ingest_pdf(pdf_path, drug_name)
-                    st.success(f"✅ Ingested {filename}")
-                except Exception as e:
-                    st.error(f"❌ Failed to ingest {filename}: {e}")
-            else:
-                st.warning(f"⚠️ {filename} not found in {PDF_DIR}")
+        """Ingest all PDF files in the pdfs directory."""
+        pdf_files = list(PDF_DIR.glob("*.pdf"))  # Dynamically fetch all PDFs in the folder
+        if not pdf_files:
+            st.warning(f"⚠️ No PDF files found in {PDF_DIR}")
+            return
+
+        for pdf_path in pdf_files:
+            drug_name = pdf_path.stem  # Use the file name (without extension) as the drug name
+            try:
+                task = Task(
+                    description=f"Ingest PDF {pdf_path.name} for drug {drug_name}",
+                    agent=self.crew_agents["ingestion"],
+                    expected_output="PDF ingested and assets extracted."
+                )
+                self.crew.tasks.append(task)
+                logger.info(f"Calling agent: {self.crew_agents['ingestion'].role}")
+                self.ingestion_agent.ingest_pdf(pdf_path, drug_name)
+                st.success(f"✅ Ingested {pdf_path.name}")
+            except Exception as e:
+                st.error(f"❌ Failed to ingest {pdf_path.name}: {e}")
 
     def process_query(self, query: str, session_id: str) -> Dict[str, Any]:
         user_info = st.session_state.get("user_info", {})
