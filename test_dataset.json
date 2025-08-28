@@ -1,0 +1,254 @@
+{
+  "test_dataset": [
+    {
+      "category": "Dosage Information",
+      "question": "What is the recommended dosage of Humira for rheumatoid arthritis?",
+      "ground_truth": "The recommended dosage of Humira for rheumatoid arthritis in adults is 40 mg administered subcutaneously every other week. Some patients may benefit from increasing the frequency to 40 mg every week if they are not taking methotrexate concomitantly."
+    },
+    {
+      "category": "Contraindications",
+      "question": "What are the contraindications for Wegovy?",
+      "ground_truth": "Wegovy is contraindicated in patients with a personal or family history of medullary thyroid carcinoma (MTC), patients with Multiple Endocrine Neoplasia syndrome type 2 (MEN 2), and patients with known hypersensitivity to semaglutide or any of the excipients in Wegovy."
+    },
+    {
+      "category": "Black Box Warnings",
+      "question": "What are the black box warnings for Rinvoq?",
+      "ground_truth": "Rinvoq carries black box warnings for increased risk of serious infections that may lead to hospitalization or death, lymphoma and other malignancies, and major adverse cardiovascular events including cardiovascular death, myocardial infarction, and stroke."
+    },
+    {
+      "category": "Mechanism of Action",
+      "question": "What is the mechanism of action of Stelara?",
+      "ground_truth": "Stelara is a human monoclonal antibody that binds to the p40 protein subunit shared by both interleukin (IL)-12 and IL-23 cytokines. By binding to this subunit, Stelara prevents IL-12 and IL-23 from binding to their receptor protein (IL-12Rβ1) on the surface of immune cells, thereby inhibiting inflammatory responses."
+    },
+    {
+      "category": "Drug Interactions",
+      "question": "Can Humira be used with live vaccines?",
+      "ground_truth": "No, live vaccines should not be administered to patients receiving Humira. Treatment with Humira may result in immunosuppression and patients may have a decreased ability to fight infections. Live vaccines could potentially cause serious infections in immunocompromised patients."
+    },
+    {
+      "category": "Storage Instructions",
+      "question": "How should Cosentyx be stored?",
+      "ground_truth": "Cosentyx should be stored in the refrigerator at 36°F to 46°F (2°C to 8°C). Do not freeze or shake. Keep in the original carton to protect from light. Allow to reach room temperature before injection."
+    },
+    {
+      "category": "Indications",
+      "question": "What types of cancer is Keytruda approved to treat?",
+      "ground_truth": "Keytruda is approved to treat various types of cancer including melanoma, non-small cell lung cancer, head and neck squamous cell carcinoma, classical Hodgkin lymphoma, primary mediastinal large B-cell lymphoma, urothelial carcinoma, microsatellite instability-high cancer, gastric cancer, cervical cancer, hepatocellular carcinoma, Merkel cell carcinoma, renal cell carcinoma, endometrial carcinoma, and triple-negative breast cancer."
+    },
+    {
+      "category": "Missed Dose",
+      "question": "What should patients do if they miss a dose of Xarelto?",
+      "ground_truth": "If a patient misses a dose of Xarelto, they should take it as soon as they remember on the same day. They should not take two doses at the same time to make up for a missed dose. The next dose should be taken at the regularly scheduled time."
+    },
+    {
+      "category": "Starting Dose",
+      "question": "What is the starting dose of Entresto for heart failure patients?",
+      "ground_truth": "The recommended starting dose of Entresto is 49/51 mg twice daily for patients not currently taking an ACE inhibitor or ARB, or patients previously taking low doses of these medications. The dose should be doubled every 2-4 weeks to reach the target maintenance dose of 97/103 mg twice daily, as tolerated."
+    },
+    {
+      "category": "Biosimilar Information",
+      "question": "What is the difference between Stelara and its biosimilar ustekinumab products?",
+      "ground_truth": "Biosimilar ustekinumab products (such as ustekinumab-aekn and ustekinumab-aauz) are highly similar to the reference product Stelara with no clinically meaningful differences in terms of safety, purity, and potency. They have the same mechanism of action, route of administration, dosage form, and strength as Stelara, but may be available at a lower cost."
+    },
+    {
+      "category": "Side Effects",
+      "question": "What are the most common side effects of Skyrizi?",
+      "ground_truth": "The most common side effects of Skyrizi include upper respiratory tract infections, headache, fatigue, injection site reactions, and tinea infections. Serious side effects may include serious infections and inflammatory bowel disease."
+    },
+    {
+      "category": "Administration",
+      "question": "How is Tremfya administered?",
+      "ground_truth": "Tremfya is administered as a subcutaneous injection. The recommended dose is 100 mg given at week 0, week 4, and then every 8 weeks thereafter. It should be administered by a healthcare professional or the patient can self-inject after proper training."
+    },
+    {
+      "category": "Pregnancy",
+      "question": "Can Taltz be used during pregnancy?",
+      "ground_truth": "There are limited data on the use of Taltz in pregnant women. Animal studies do not indicate direct or indirect harmful effects with respect to reproductive toxicity. Taltz should be used during pregnancy only if the potential benefit justifies the potential risk to the fetus."
+    },
+    {
+      "category": "Monitoring",
+      "question": "What monitoring is required for patients taking Otezla?",
+      "ground_truth": "Patients taking Otezla should be monitored for weight loss, as significant weight loss has been reported. Regular monitoring of mood changes and depression is also recommended, particularly during the initial months of treatment. Complete blood count should be monitored periodically."
+    },
+    {
+      "category": "Drug Class",
+      "question": "What drug class does Gilenya belong to?",
+      "ground_truth": "Gilenya (fingolimod) belongs to the class of drugs called sphingosine 1-phosphate receptor modulators. It works by preventing lymphocytes from leaving lymph nodes, thereby reducing the number of lymphocytes available to the central nervous system."
+    },
+    {
+      "category": "Cardiac Monitoring",
+      "question": "What cardiac monitoring is required when starting Gilenya?",
+      "ground_truth": "Before starting Gilenya, patients should have an ECG and blood pressure measurement. After the first dose, patients should be observed for 6 hours for signs of bradycardia and AV conduction delays. ECG should be obtained at the end of the observation period."
+    },
+    {
+      "category": "Liver Function",
+      "question": "How does Kymriah affect liver function?",
+      "ground_truth": "Kymriah can cause hepatotoxicity, including elevated transaminases and bilirubin. Liver function tests should be monitored before and after Kymriah infusion. In clinical trials, Grade 3 or 4 increases in ALT, AST, and bilirubin were observed in some patients."
+    },
+    {
+      "category": "Infusion Reactions",
+      "question": "What are the signs of infusion reactions with Keytruda?",
+      "ground_truth": "Signs of infusion reactions with Keytruda may include fever, chills, wheezing, pruritis, flushing, rash, hypotension, hypoxemia, and hypertension. Severe infusion reactions may require permanent discontinuation of Keytruda and treatment with corticosteroids."
+    },
+    {
+      "category": "Food Interactions",
+      "question": "Should Xeljanz be taken with food?",
+      "ground_truth": "Xeljanz can be taken with or without food. Food does not significantly affect the absorption of tofacitinib. However, taking it with food may help reduce potential gastrointestinal side effects."
+    },
+    {
+      "category": "Renal Impairment",
+      "question": "How should Trulicity dosing be adjusted in patients with renal impairment?",
+      "ground_truth": "No dose adjustment of Trulicity is required in patients with mild or moderate renal impairment. In patients with severe renal impairment or end-stage renal disease, Trulicity should be used with caution due to limited experience in these populations."
+    },
+    {
+      "category": "Pediatric Use",
+      "question": "What is the approved pediatric indication for Humira?",
+      "ground_truth": "Humira is approved for pediatric use in juvenile idiopathic arthritis (JIA) in patients 4 years of age and older, pediatric Crohn's disease in patients 6 years of age and older, and pediatric ulcerative colitis in patients 5 years of age and older."
+    },
+    {
+      "category": "Vaccination",
+      "question": "When should vaccinations be administered in patients taking Rinvoq?",
+      "ground_truth": "Live vaccines should not be given during treatment with Rinvoq. Non-live vaccines may be administered, but the response may be diminished. It is recommended to complete all age-appropriate vaccinations before starting Rinvoq treatment."
+    },
+    {
+      "category": "Laboratory Monitoring",
+      "question": "What laboratory tests should be monitored in patients taking Rinvoq?",
+      "ground_truth": "Patients taking Rinvoq should have regular monitoring of complete blood count including lymphocyte count, liver function tests, and lipid profile. Tuberculosis screening should be performed before starting treatment and periodically during therapy."
+    },
+    {
+      "category": "Drug Interactions",
+      "question": "What are the significant drug interactions with Xarelto?",
+      "ground_truth": "Significant drug interactions with Xarelto include strong CYP3A4 and P-gp inhibitors (such as ketoconazole, ritonavir) and strong CYP3A4 and P-gp inducers (such as rifampin, phenytoin). These combinations should be avoided as they can significantly alter rivaroxaban exposure."
+    },
+    {
+      "category": "Overdose",
+      "question": "What is the management of Wegovy overdose?",
+      "ground_truth": "In case of Wegovy overdose, supportive care should be initiated based on the patient's clinical signs and symptoms. Due to the long half-life of semaglutide, prolonged monitoring may be required. There is no specific antidote for semaglutide overdose."
+    },
+    {
+      "category": "Injection Site Reactions",
+      "question": "How should injection site reactions with Cosentyx be managed?",
+      "ground_truth": "Mild injection site reactions with Cosentyx (such as erythema, swelling, itching, or pain) are common and usually resolve within a few days. Patients should rotate injection sites and apply ice before and after injection. If reactions are severe or persistent, consult healthcare provider."
+    },
+    {
+      "category": "Effectiveness Timeline",
+      "question": "How long does it take for Skyrizi to show effectiveness in psoriasis?",
+      "ground_truth": "Clinical improvement with Skyrizi in psoriasis may be seen as early as 4 weeks, with continued improvement through 16 weeks. The majority of patients who achieved PASI 90 at week 16 maintained this response through week 52 in clinical trials."
+    },
+    {
+      "category": "Genetic Testing",
+      "question": "Is genetic testing required before prescribing any of these medications?",
+      "ground_truth": "Genetic testing is not routinely required for most of these medications. However, HLA-B*5701 testing may be considered before abacavir-containing regimens, and some centers may test for specific genetic markers related to drug metabolism for certain medications."
+    },
+    {
+      "category": "Travel Considerations",
+      "question": "What should patients consider when traveling with injectable medications like Humira?",
+      "ground_truth": "Patients traveling with injectable medications should carry them in original packaging with prescription labels, bring a letter from their healthcare provider, pack medications in carry-on luggage, ensure proper temperature storage, and bring extra supplies in case of delays."
+    },
+    {
+      "category": "Cost Considerations",
+      "question": "Are there patient assistance programs available for expensive biologics?",
+      "ground_truth": "Yes, most pharmaceutical companies offer patient assistance programs for expensive biologics. These programs may provide copay cards, free drug programs for uninsured patients, or foundation grants. Patients should contact the manufacturer or speak with their healthcare provider about available options."
+    },
+    {
+      "category": "Immunosuppression",
+      "question": "How do TNF inhibitors like Humira affect the immune system?",
+      "ground_truth": "TNF inhibitors like Humira block tumor necrosis factor alpha, a key inflammatory cytokine. This immunosuppressive effect increases the risk of serious infections, including opportunistic infections, and may increase the risk of certain malignancies, particularly lymphomas."
+    },
+    {
+      "category": "Discontinuation",
+      "question": "What happens when Gilenya is discontinued?",
+      "ground_truth": "When Gilenya is discontinued, its effects on heart rate return to baseline within 2 months, and lymphocyte counts return to normal range within 1-2 months. However, there may be an increased risk of disease reactivation, so patients should be monitored for returning symptoms."
+    },
+    {
+      "category": "Alcohol Interaction",
+      "question": "Can patients drink alcohol while taking Otezla?",
+      "ground_truth": "There are no specific contraindications for alcohol consumption with Otezla. However, alcohol may worsen some side effects such as nausea, diarrhea, and depression. Patients should discuss alcohol consumption with their healthcare provider."
+    },
+    {
+      "category": "Surgery Considerations",
+      "question": "Should biologic medications be stopped before surgery?",
+      "ground_truth": "The decision to stop biologic medications before surgery depends on the type of surgery, infection risk, and disease severity. Generally, biologics may be held before major surgery to reduce infection risk, but this should be individualized and discussed with both the surgeon and prescribing physician."
+    },
+    {
+      "category": "Emergency Situations",
+      "question": "What should patients do if they experience severe allergic reactions to these medications?",
+      "ground_truth": "Patients experiencing severe allergic reactions should seek immediate emergency medical attention. Symptoms may include difficulty breathing, swelling of face/lips/tongue, severe rash, or dizziness. Epinephrine may be administered, and the medication should be permanently discontinued."
+    },
+    {
+      "category": "Quality of Life",
+      "question": "How do these medications typically affect patient quality of life?",
+      "ground_truth": "When effective, these medications can significantly improve quality of life by reducing disease symptoms, pain, and inflammation. However, they may also cause side effects that impact daily activities. Regular monitoring and open communication with healthcare providers help optimize treatment benefits."
+    },
+    {
+      "category": "Generic Availability",
+      "question": "Are generic versions available for these biologic medications?",
+      "ground_truth": "Generic versions are not available for biologic medications due to their complex structure. However, biosimilar versions may be available for some biologics like adalimumab (Humira), offering similar efficacy at potentially lower cost."
+    },
+    {
+      "category": "Age Restrictions",
+      "question": "What are the age restrictions for Keytruda use?",
+      "ground_truth": "Keytruda is approved for use in adults and pediatric patients. The specific age varies by indication - for melanoma and most solid tumors, it's approved for adults. For certain pediatric cancers like primary mediastinal large B-cell lymphoma, it may be used in patients 12 years and older."
+    },
+    {
+      "category": "Fertility Effects",
+      "question": "Do these medications affect fertility?",
+      "ground_truth": "The effects on fertility vary by medication. Some medications like methotrexate (often used with biologics) may affect fertility. For specific biologics, fertility studies in humans are limited. Patients planning pregnancy should discuss fertility concerns with their healthcare provider."
+    },
+    {
+      "category": "Mental Health",
+      "question": "Can Otezla affect mental health?",
+      "ground_truth": "Yes, Otezla has been associated with depression, suicidal ideation, and mood changes. Patients and caregivers should be advised to monitor for new or worsening depression, suicidal thoughts, or other mood changes, especially during the initial months of treatment."
+    },
+    {
+      "category": "Drug Formulations",
+      "question": "What different formulations are available for Humira?",
+      "ground_truth": "Humira is available in multiple formulations including prefilled syringes, prefilled pens (Humira Pen), and citrate-free formulations. The citrate-free version is designed to reduce injection site pain. All formulations contain the same active ingredient, adalimumab."
+    },
+    {
+      "category": "Insurance Coverage",
+      "question": "What factors affect insurance coverage for these expensive medications?",
+      "ground_truth": "Insurance coverage factors include prior authorization requirements, step therapy (trying less expensive alternatives first), quantity limits, specialty pharmacy requirements, and medical necessity documentation. Coverage varies significantly between insurance plans and may require appeals."
+    },
+    {
+      "category": "Clinical Trials",
+      "question": "How were the efficacy and safety of these medications established?",
+      "ground_truth": "Efficacy and safety were established through randomized controlled clinical trials comparing these medications to placebo or active comparators. These trials typically involve hundreds to thousands of patients and follow strict protocols for safety monitoring and efficacy assessment over months to years."
+    },
+    {
+      "category": "Biomarkers",
+      "question": "Are there biomarkers that predict response to these medications?",
+      "ground_truth": "Some biomarkers may predict response, such as PD-L1 expression for Keytruda in certain cancers, or genetic polymorphisms affecting drug metabolism. However, most biologics for autoimmune conditions don't have established predictive biomarkers, and treatment selection is often based on clinical factors."
+    },
+    {
+      "category": "Drug Resistance",
+      "question": "Can patients develop resistance to these medications?",
+      "ground_truth": "Yes, patients can develop resistance through various mechanisms including formation of anti-drug antibodies (immunogenicity), disease progression, or receptor/pathway changes. This is why some patients may lose response over time and require dose adjustments or medication changes."
+    },
+    {
+      "category": "Combination Therapy",
+      "question": "Can these medications be used in combination with other treatments?",
+      "ground_truth": "Many of these medications can be used in combination with other treatments. For example, biologics are often combined with methotrexate or other conventional DMARDs. However, combinations require careful monitoring for increased side effects and drug interactions."
+    },
+    {
+      "category": "Long-term Safety",
+      "question": "What are the long-term safety concerns with biologic medications?",
+      "ground_truth": "Long-term safety concerns include increased risk of serious infections, certain malignancies (particularly lymphomas), progressive multifocal leukoencephalopathy (rare), and potential cardiovascular effects. Long-term registries and post-marketing surveillance continue to monitor these risks."
+    },
+    {
+      "category": "Patient Education",
+      "question": "What key points should be included in patient education for these medications?",
+      "ground_truth": "Patient education should cover proper injection technique, storage requirements, signs of infection or serious side effects, importance of regular monitoring, vaccine considerations, when to contact healthcare providers, and the importance of adherence to treatment regimens."
+    },
+    {
+      "category": "Regulatory Approval",
+      "question": "How are these medications approved by regulatory agencies?",
+      "ground_truth": "Medications are approved through rigorous review processes by agencies like FDA, EMA. This includes review of preclinical data, clinical trial results for safety and efficacy, manufacturing information, and risk-benefit assessment. Post-marketing surveillance continues after approval."
+    },
+    {
+      "category": "Global Access",
+      "question": "How does access to these medications vary globally?",
+      "ground_truth": "Access varies significantly globally due to regulatory approval timelines, healthcare system differences, cost considerations, and infrastructure requirements. Developed countries typically have earlier access, while developing nations may face significant barriers to access due to cost and distribution challenges."
+    }
+  ]
+}
